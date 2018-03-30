@@ -1,6 +1,6 @@
 {
   "name": "bitclimb-redis",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An updated fork of PM2 module `pm2-redis` that monitors a Redis server with Keymetrics.",
   "main": "app.js",
   "repository": {
