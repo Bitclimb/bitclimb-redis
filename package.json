@@ -1,32 +1,39 @@
 {
-  "name": "pm2-redis",
-  "version": "2.1.0",
-  "description": "PM2 Module to monitor redis",
+  "name": "bitclimb-redis",
+  "version": "1.0.0",
+  "description": "An updated fork of PM2 module `pm2-redis` that monitors a Redis server with Keymetrics.",
   "main": "app.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pm2-hive/pm2-redis.git" 
-  }, 
-  "bugs": {
-    "url": "https://github.com/pm2-hive/pm2-redis/issues"
+    "url": "https://github.com/Bitclimb/bitclimb-redis.git"
   },
-  "homepage": "https://github.com/pm2-hive/pm2-redis",
+  "bugs": {
+    "url": "https://github.com/Bitclimb/bitclimb-redis/issues"
+  },
+  "homepage": "https://github.com/Bitclimb/bitclimb-redis",
   "dependencies": {
-    "pmx": "*",
-    "redis": "*"
+    "pmx": "^1.6.4",
+    "redis": "^2.8.0"
   },
   "apps": [
     {
-      "name": "pm2-redis",
+      "name": "bitclimb-redis",
       "script": "app.js"
     }
   ],
   "config": {
-    "ip": "127.0.0.1",
+    "host": "127.0.0.1",
     "port": "6379",
     "password": "",
+    "jsonfile": "",
     "workerInterval": 2
   },
   "author": "vmarchaud",
+  "contributors": [
+    {
+      "name": "unibtc",
+      "email": "unibtc@bitclimb.com"
+    }
+  ],
   "license": "MIT"
 }

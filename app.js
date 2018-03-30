@@ -1,83 +1,75 @@
 /**
- * Copyright 2016 Keymetrics Team. All rights reserved.
+ * Copyright 2016 Keymetrics Team, Copyright 2018 Keymetrics Team. All rights reserved.
  * Use of this source code is governed by a license that
  * can be found in the LICENSE file.
  */
 
-var pmx         = require('pmx'),
-    exec        = require('child_process').exec,
-    redis       = require('redis'),
-    metricsMod  = require('./lib/metrics.js');
+const pmx = require('pmx');
+const { execFileSync } = require('child_process');
+const Redis = require('redis');
+const metricsMod = require('./lib/metrics');
+const { findPidFile } = require('./lib/helpers');
 
-var conf = pmx.initModule({
-  pid    : pmx.resolvePidPaths(['/var/run/redis/redis-server.pid',
-                                '/var/run/redis/redis.pid',
-                                '/var/run/redis-server.pid',
-                                '/var/run/redis.pid']),
-  
-  widget : {
-    type : 'generic',
-    logo : 'https://raw.githubusercontent.com/pm2-hive/pm2-redis/master/pres/redis-white.png',
-
-    // 0 = main element
-    // 1 = secondary
-    // 2 = main border
-    // 3 = secondary border
-    theme : ['#9F1414', '#591313', 'white', 'white'],
-
-    el : {
-      probes  : true,
-      actions : true
+pmx.initModule({
+  pid: findPidFile('/var/run', 'redis'),
+  widget: {
+    type: 'generic',
+    logo: 'https://raw.githubusercontent.com/pm2-hive/pm2-redis/master/pres/redis-white.png',
+    theme: ['#D32F2F', '#1b2228', '#607D8B', '#F44336'],
+    el: {
+      probes: true,
+      actions: true
     },
-
-    block : {
-      actions : true,
-      issues  : true,
-      meta    : false,
-      main_probes : ['Total keys', 'cmd/sec', 'hits/sec', 'miss/sec', 'evt/sec', 'exp/sec']
+    block: {
+      actions: true,
+      issues: true,
+      meta: false,
+      main_probes: ['Total keys', 'cmd/sec', 'hits/sec', 'miss/sec', 'evt/sec', 'exp/sec']
     }
   }
-}, function(err, conf) {
-
-  var WORKER_INTERVAL = (conf.workerInterval * 1000) || 2000;
-  var REDIS_PORT      = conf.port || process.env.PM2_REDIS_PORT;
-  var REDIS_IP        = conf.ip || process.env.PM2_REDIS_IP;
-  var REDIS_PWD       = conf.password || process.env.PM2_REDIS_PWD;
-  
-  client = redis.createClient(REDIS_PORT, REDIS_IP, {});
-
-  if (typeof(REDIS_PWD) === 'string')
-    client.auth(REDIS_PWD);
-
-  // construc metrics
-  var metrics = new metricsMod(WORKER_INTERVAL);
-
-  // init metrics
-  metrics.initMetrics();
-
-  /** When the client is connected, start the worker */
-  client.on("ready", function () {
-    // set general redis metrics that doesnt change
-    metrics.probes.redisTcp.set(client.server_info.tcp_port);
-    metrics.probes.redisProcId.set(client.server_info.process_id);
-    metrics.probes.redisVersion.set(client.server_info.redis_version);
-    
-    // start worker
-    metrics.updateMetrics();
-    setInterval(metrics.updateMetrics.bind(metrics), WORKER_INTERVAL);
+}, (err, conf) => {
+  let jsonconf;
+  if (conf.jsonfile) {
+    try {
+      jsonconf = require(conf.jsonfile);
+    } catch (e) {
+      console.error(e.message);
+      jsonconf = null;
+    }
+  }
+  if (!jsonconf) {
+    conf.port = process.env.REDIS_PORT || process.env.PM2_REDIS_PORT || conf.port;
+    conf.host = process.env.REDIS_HOST || process.env.PM2_REDIS_HOST || conf.host;
+    conf.password = process.env.REDIS_PW || process.env.PM2_REDIS_PW || conf.password;
+    conf.url = process.env.REDIS_URL || process.env.PM2_REDIS_URL || conf.url;
+    /* delete sensitive information */
+    delete process.env.REDIS_PW;
+    delete process.env.PM2_REDIS_PW;
+    delete process.env.REDIS_URL;
+    delete process.env.PM2_REDIS_URL;
+  } else {
+    if (jsonconf.REDIS_URL) {
+      conf.url = jsonconf.REDIS_URL;
+    } else {
+      conf.port = jsonconf.REDIS_PORT || 6379;
+      conf.host = jsonconf.REDIS_HOST || '127.0.0.1';
+      conf.password = jsonconf.REDIS_PW || null;
+    }
+  }
+  const redis = Redis.createClient(conf.url || conf);
+  redis.on('error', err => {
+    console.error(err.stack || err.message);
   });
-
-  // register restart action
-  pmx.action('restart', function(reply) {
-    exec('/etc/init.d/redis-server restart', function (err, out, error) {
-      return err ? reply(err) : reply(out);
-    });
+  redis.on('ready', async () => {
+    const metrics = new metricsMod(redis, conf.workerInterval);
+    await metrics.initMetrics();
   });
-
-  // register restart action
-  pmx.action('backup', function(reply) {
-    exec('redis-cli bgsave', function (err, out, error) {
-      return err ? reply(err) : reply(out);
-    });
+  pmx.action('shutdown', reply => {
+    try {
+      redis.shutdown();
+      reply(true);
+    } catch (e) {
+      reply(e);
+    }
   });
 });
