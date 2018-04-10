@@ -8,6 +8,7 @@ const pmx = require('pmx');
 const { execFileSync } = require('child_process');
 const Redis = require('redis');
 const metricsMod = require('./lib/metrics');
+const actions = require('./lib/actions');
 const { findPidFile } = require('./lib/helpers');
 
 pmx.initModule({
@@ -21,7 +22,7 @@ pmx.initModule({
       actions: true
     },
     block: {
-      actions: true,
+      actions: false,
       issues: true,
       meta: false,
       main_probes: ['Total keys', 'cmd/sec', 'hits/sec', 'miss/sec', 'evt/sec', 'exp/sec']
@@ -64,12 +65,5 @@ pmx.initModule({
     const metrics = new metricsMod(redis, conf.workerInterval);
     await metrics.initMetrics();
   });
-  pmx.action('shutdown', reply => {
-    try {
-      redis.shutdown();
-      reply(true);
-    } catch (e) {
-      reply(e);
-    }
-  });
+  actions(redis);
 });
